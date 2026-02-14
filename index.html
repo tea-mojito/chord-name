@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chord Detector</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;600&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@0..1" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a73e8" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+</head>
+<body>
+  <div class="app">
+    <header class="panel control-panel">
+      <div class="options-grid">
+        <section class="option-col">
+          <button id="midiBtn" type="button" class="midi-connect-btn">CONNECT TO MIDI</button>
+          <div class="inline-group">
+            <label for="midiInputSel">INPUT</label>
+            <select id="midiInputSel"><option value="">-</option></select>
+          </div>
+          <div class="inline-group">
+            <label for="midiChSel">CH</label>
+            <select id="midiChSel">
+              <option value="0">All</option>
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+              <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+              <option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+              <option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option>
+            </select>
+          </div>
+          <span id="midiStatusText" class="status"></span>
+        </section>
+
+        <section class="option-col">
+
+          <div class="inline-group">
+            <label for="waveSel" class="icon-label" aria-label="音色" title="音色">
+              <span class="material-symbols-rounded" aria-hidden="true">music_note</span>
+            </label>
+            <select id="waveSel">
+              <option value="triangle" selected>triangle</option>
+              <option value="sine">sine</option>
+              <option value="square">square</option>
+              <option value="sawtooth">saw</option>
+            </select>
+          </div>
+          <div class="inline-group inline-group--volume">
+            <button id="muteBtn" type="button" class="icon-label icon-button" aria-pressed="false" aria-label="ミュート" title="ミュート">
+              <span class="material-symbols-rounded" aria-hidden="true">volume_up</span>
+            </button>
+            <input id="vol" type="range" min="0" max="1" step="0.01" value="1" />
+          </div>
+        </section>
+
+        <section class="option-col">
+          <div class="inline-group key-group">
+            <label for="keyMajorSel">KEY</label>
+            <select id="keyMajorSel">
+              <option value="" selected>-</option>
+              <option value="C:maj">C</option><option value="G:maj">G</option><option value="D:maj">D</option><option value="A:maj">A</option>
+              <option value="E:maj">E</option><option value="B:maj">B</option><option value="F#:maj">F#</option><option value="Gb:maj">Gb</option>
+              <option value="Db:maj">Db</option><option value="Ab:maj">Ab</option><option value="Eb:maj">Eb</option><option value="Bb:maj">Bb</option>
+              <option value="F:maj">F</option>
+            </select>
+            <select id="keyMinorSel">
+              <option value="" selected>-</option>
+              <option value="A:min">Am</option><option value="E:min">Em</option><option value="B:min">Bm</option><option value="F#:min">F#m</option>
+              <option value="C#:min">C#m</option><option value="G#:min">G#m</option><option value="D#:min">D#m</option><option value="Eb:min">Ebm</option>
+              <option value="Bb:min">Bbm</option><option value="F:min">Fm</option><option value="C:min">Cm</option><option value="G:min">Gm</option>
+              <option value="D:min">Dm</option>
+            </select>
+          </div>
+          <div class="inline-group">
+            <label>MATCH</label>
+            <select id="candidateFilterSel">
+              <option value="all" selected>All</option>
+              <option value="exact">Perfect</option>
+            </select>
+          </div>
+          <div class="inline-group">
+            <label for="labelPresetSel" class="icon-label" aria-label="表記" title="表記">
+              <span class="material-symbols-rounded" aria-hidden="true">edit_note</span>
+            </label>
+            <select id="labelPresetSel">
+              <option value="jazz" selected>Jazz</option>
+              <option value="general">Standard</option>
+            </select>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <main class="panel result-panel">
+      <section class="held-panel">
+        <!-- <div class="section-title">HELD</div> -->
+        <div id="heldNotes" class="held-notes"></div>
+      </section>
+
+      <section class="candidate-panel">
+        <!-- <div class="section-title">候補コード</div> -->
+        <div id="candidateList" class="candidate-grid"></div>
+      </section>
+    </main>
+
+    <div class="floating-actions-top" aria-label="Quick Actions">
+      <button id="togglePanelBtn" type="button" class="floating-btn text-action" aria-label="Control Panel" title="Control Panel">
+        <span class="material-symbols-rounded" aria-hidden="true">menu</span>
+      </button>
+      <button id="panicBtn" type="button" class="floating-btn text-action danger" aria-label="PANIC" title="PANIC">
+        <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+      </button>
+      <button id="lockBtn" type="button" class="floating-btn lock-btn text-action" aria-pressed="false" aria-label="Lock" title="Lock">
+        <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+      </button>
+    </div>
+
+    <button id="fullscreenBtn" type="button" class="floating-btn floating-btn-bottom text-action" aria-label="Fullscreen" title="Fullscreen">
+      <span class="material-symbols-rounded" aria-hidden="true">fullscreen</span>
+    </button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js");
+    }
+  </script>
+</body>
+</html>
