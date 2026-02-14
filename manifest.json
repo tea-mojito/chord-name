@@ -1,6 +1,6 @@
 {
-  "name": "Chord Detector",
-  "short_name": "ChordDet",
+  "name": "ChordName",
+  "short_name": "ChordName",
   "description": "Real-time MIDI chord recognition",
   "start_url": "./index.html",
   "scope": "./",
