@@ -12,7 +12,10 @@ const STORAGE_KEYS = {
   labelPreset: "mvp:label_preset",
   wave: "mvp:wave",
   volume: "mvp:volume",
-  mute: "mvp:mute"
+  mute: "mvp:mute",
+  showTones: "mvp:show_tones",
+  showMeta: "mvp:show_meta",
+  showHeld: "mvp:show_held"
 };
 
 const midiStatusText = document.getElementById("midiStatusText");
@@ -30,6 +33,9 @@ const waveSel = document.getElementById("waveSel");
 const volEl = document.getElementById("vol");
 const muteBtn = document.getElementById("muteBtn");
 const lockBtn = document.getElementById("lockBtn");
+const showTonesSel = document.getElementById("showTonesSel");
+const showMetaSel = document.getElementById("showMetaSel");
+const showHeldSel = document.getElementById("showHeldSel");
 const controlPanelEl = document.querySelector(".control-panel");
 const heldNotesEl = document.getElementById("heldNotes");
 const candidateListEl = document.getElementById("candidateList");
@@ -83,7 +89,8 @@ function renderCandidates(list) {
 
   list.slice(0, 12).forEach((item) => {
     const card = document.createElement("article");
-    card.className = "candidate-card";
+    const matchClass = item.exact ? "match-exact" : "match-partial";
+    card.className = "candidate-card " + matchClass;
 
     const name = document.createElement("h3");
     name.className = "candidate-name";
@@ -213,6 +220,24 @@ function setChordLabelPreset(mode) {
   if (labelPresetSel) labelPresetSel.value = chordLabelPreset;
   localStorage.setItem(STORAGE_KEYS.labelPreset, chordLabelPreset);
   refreshCandidates();
+}
+
+function applyShowTones(show) {
+  candidateListEl?.classList.toggle("hide-tones", !show);
+  if (showTonesSel) showTonesSel.value = show ? "on" : "off";
+  localStorage.setItem(STORAGE_KEYS.showTones, show ? "on" : "off");
+}
+
+function applyShowMeta(show) {
+  candidateListEl?.classList.toggle("hide-meta", !show);
+  if (showMetaSel) showMetaSel.value = show ? "on" : "off";
+  localStorage.setItem(STORAGE_KEYS.showMeta, show ? "on" : "off");
+}
+
+function applyShowHeld(show) {
+  heldNotesEl?.classList.toggle("hide-held", !show);
+  if (showHeldSel) showHeldSel.value = show ? "on" : "off";
+  localStorage.setItem(STORAGE_KEYS.showHeld, show ? "on" : "off");
 }
 
 function applyMuteState(muted) {
@@ -346,6 +371,16 @@ function installEvents() {
     setChordLabelPreset(e.target.value);
   });
 
+  showTonesSel?.addEventListener("change", (e) => {
+    applyShowTones(e.target.value === "on");
+  });
+  showMetaSel?.addEventListener("change", (e) => {
+    applyShowMeta(e.target.value === "on");
+  });
+  showHeldSel?.addEventListener("change", (e) => {
+    applyShowHeld(e.target.value === "on");
+  });
+
   waveSel?.addEventListener("change", (e) => {
     const value = e.target.value || "triangle";
     setSynthType(value);
@@ -396,7 +431,7 @@ function restoreSettings() {
   const savedKey = localStorage.getItem(STORAGE_KEYS.keySel) || "";
   applyKeySelection(savedKey);
 
-  const savedFilter = localStorage.getItem(STORAGE_KEYS.filterMode) || "all";
+  const savedFilter = localStorage.getItem(STORAGE_KEYS.filterMode) || "exact";
   setFilterMode(savedFilter);
 
   localStorage.removeItem(STORAGE_KEYS.lock);
@@ -421,6 +456,15 @@ function restoreSettings() {
     if (volEl) volEl.value = "0";
     setMasterVolume(0);
   }
+
+  const savedShowTones = localStorage.getItem(STORAGE_KEYS.showTones);
+  applyShowTones(savedShowTones !== "off");
+
+  const savedShowMeta = localStorage.getItem(STORAGE_KEYS.showMeta);
+  applyShowMeta(savedShowMeta === "on");
+
+  const savedShowHeld = localStorage.getItem(STORAGE_KEYS.showHeld);
+  applyShowHeld(savedShowHeld !== "off");
 }
 
 function init() {
