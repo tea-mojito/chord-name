@@ -114,7 +114,7 @@ function renderCandidates(list) {
       }
       tones.appendChild(part);
       if (index < toneNames.length - 1) {
-        tones.append(" ・ ");
+        tones.append("・");
       }
     });
 
@@ -427,11 +427,19 @@ function installEvents() {
   });
 
   document.addEventListener("fullscreenchange", updateFullscreenButtonVisibility);
+  document.addEventListener("webkitfullscreenchange", updateFullscreenButtonVisibility);
+  window.addEventListener("resize", updateFullscreenButtonVisibility);
 }
 
 function updateFullscreenButtonVisibility() {
   if (!fullscreenBtn) return;
-  fullscreenBtn.hidden = Boolean(document.fullscreenElement);
+  const apiFullscreen = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  const displayModeFullscreen = window.matchMedia?.("(display-mode: fullscreen)").matches;
+  const iosStandalone = window.navigator.standalone === true;
+  const browserFullscreen =
+    Math.abs(window.innerHeight - window.screen.height) <= 1 &&
+    Math.abs(window.innerWidth - window.screen.width) <= 1;
+  fullscreenBtn.hidden = apiFullscreen || displayModeFullscreen || iosStandalone || browserFullscreen;
 }
 
 function restoreSettings() {

@@ -277,6 +277,8 @@ select {
   border-radius: 8px;
 }
 
+.floating-btn[hidden] { display: none !important; }
+
 .floating-btn-bottom {
   position: fixed;
   right: var(--floating-right);
