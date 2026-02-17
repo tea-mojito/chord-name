@@ -425,6 +425,13 @@ function installEvents() {
       // ignore
     }
   });
+
+  document.addEventListener("fullscreenchange", updateFullscreenButtonVisibility);
+}
+
+function updateFullscreenButtonVisibility() {
+  if (!fullscreenBtn) return;
+  fullscreenBtn.hidden = Boolean(document.fullscreenElement);
 }
 
 function restoreSettings() {
@@ -470,6 +477,7 @@ function restoreSettings() {
 function init() {
   controlPanelEl?.classList.toggle("collapsed", !isPanelOpen);
   installEvents();
+  updateFullscreenButtonVisibility();
   restoreSettings();
   setInputFilter(midiInputSel?.value || "");
   setChannelFilter(midiChSel?.value || "0");
