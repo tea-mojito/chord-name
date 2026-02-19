@@ -246,12 +246,14 @@ export function buildChordSpelling(rootName, chordDef) {
   const rootLetter = rootName[0];
   const rootPC = noteNameToPC(rootName);
   const rootLetterIndex = LETTERS.indexOf(rootLetter);
-  const order = (chordDef.core || []).concat(chordDef.opt || []);
-  const deg = (chordDef.deg || []);
+  const rawOrder = (chordDef.core || []).concat(chordDef.opt || []);
+  const rawDeg = (chordDef.deg || []);
+  const pairs = rawOrder.map((iv, i) => ({ iv, d: rawDeg[i] }));
+  pairs.sort((a, b) => a.iv - b.iv);
   const tones = [];
-  for (let i = 0; i < order.length; i++) {
-    const semis = ((order[i] % 12) + 12) % 12;
-    const degree = deg[i] % 7;
+  for (let i = 0; i < pairs.length; i++) {
+    const semis = ((pairs[i].iv % 12) + 12) % 12;
+    const degree = pairs[i].d % 7;
     const targetLetter = LETTERS[(rootLetterIndex + degree) % 7];
     const basePC = NATURAL_PC[targetLetter];
     const targetPC = (rootPC + semis) % 12;
@@ -347,6 +349,6 @@ export const NOTE_STOP_CLEANUP_DELAY_MS = 140; // Delay before voice cleanup aft
 export const PIANO_SYNTH_DURATION_SEC = 3.5; // Piano synthesis envelope duration
 
 // ===== Chord Recognition Scoring Constants =====
-export const SCORE_EXACT_MATCH = 101; // Score for exact chord match (all tones present)
-export const SCORE_OPT_MISS = 100; // Score for optional tone miss (core tones present)
+export const SCORE_EXACT_MATCH = 10; // Score for exact chord match (all tones present)
+export const SCORE_OPT_MISS = 11; // Score for optional tone miss (core tones present)
 export const MAX_CHORD_CANDIDATES = 32; // Maximum number of chord candidates to return

@@ -6,7 +6,6 @@ import {
   buildChordSpelling,
   powerSet,
   rootNamesForPC,
-  selectRootNameForPC,
   uniq,
   NOTE_NAMES_SHARP,
   ENHARMONIC_PC,
@@ -149,7 +148,7 @@ function shouldAlwaysHide(name){
 
 /* ====== キー由来の異名同音スペルに対するスコアペナルティ ====== */
 function computeKeySpellingPenalty(name){
-  const KEY_SPELLING_PENALTY = 200;
+  const KEY_SPELLING_PENALTY = 1;
   try{
     if(keySignaturePref!==undefined){
       const m = name.match(/^[A-G](?:#|b)?/i);
@@ -185,7 +184,7 @@ function stripRootName(name){ return name.replace(/^[A-G](?:#|b|x)?/i,""); }
 const FAMILY_RULES = [
   // 末尾に回したい特殊系
   { name:"SpecialLast",
-    test:(base)=>/(?:^sus[24]\b|^aug\b|^dim$|^7\(\s*b5\s*\)$|^7b5\b|^m7b5\b|\bdim7\b|aug7\b|7(?:sus2|sus4)?\b)/i.test(base)
+    test:(base)=>/(?:^sus[24]\b|^aug\b|^dim$|^7\(\s*b5\s*\)$|^7b5\b|^m7b5\b|\bdim7\b|aug7\b|7(?:sus2|sus4)\b)/i.test(base)
   },
   // ★ Em+5 を強く見せたい：m+5 を Minor より上位の専用ファミリへ
   { name:"MinorAug5",
@@ -249,6 +248,7 @@ const SCORE_BONUS = {
   parenPenalty: 6,
   parenMissingRoot: 8,
   tensionPenalty: 3,
+  relaxedMiss: 1,
 };
 
 const DEGREE_PRIORITY = {
@@ -451,17 +451,6 @@ export function parseRootText(txt){
   return (t in map)?map[t]:null;
 }
 
-// 完全五度は常に任意扱いへ移す（省略しても一致判定可）
-function applyOptionalFifth(corePCs, optPCs, root){
-  const perfectFifth = pc(root + 7);
-  if(!corePCs.includes(perfectFifth)) return { corePCs, optPCs, relaxedOpt:new Set() };
-  const nextCore = corePCs.filter(p=>p!==perfectFifth);
-  const optSet = new Set(optPCs);
-  optSet.add(perfectFifth);
-  const nextOpt = [...optSet].filter(p=>!nextCore.includes(p));
-  const relaxedOpt = new Set([perfectFifth]);
-  return { corePCs:nextCore, optPCs:nextOpt, relaxedOpt };
-}
 
 /**
  * コード候補を検出する（コア認識エンジン）
@@ -472,8 +461,6 @@ function applyOptionalFifth(corePCs, optPCs, root){
  * @param {Set<number>} pitches - ピッチクラス (0-11) のセット。0=C, 1=C#/Db, ..., 11=B
  * @param {number|null} [forcedRootPC=null] - 強制的に指定するルート音のピッチクラス (0-11)
  * @param {number|null} [lowestBassPC=null] - 最低音のピッチクラス（オンコード判定用、現在未使用）
- * @param {string|null} [keyName=null] - 現在のキー名 (例: 'C', 'F#', 'Bb')
- * @param {string|null} [keyMode=null] - キーモード ('maj', 'min_nat', 'min_har', 'min_mel')
  *
  * @returns {Array<Object>} スコア順にソートされたコード候補の配列（最大32件）。各候補の構造：
  *   - name {string}: 完全なコード名 (例: 'CMaj7', 'F#m7b5')
@@ -489,17 +476,17 @@ function applyOptionalFifth(corePCs, optPCs, root){
  *
  * @example
  * // Cメジャートライアド (C-E-G) を認識
- * const candidates = detectChords(new Set([0, 4, 7]), null, null, 'C', 'maj');
+ * const candidates = detectChords(new Set([0, 4, 7]));
  * console.log(candidates[0].name); // "C"
  * console.log(candidates[0].exact); // true
  *
  * @example
  * // CMaj7 (C-E-G-B) をCキーで認識
- * const candidates = detectChords(new Set([0, 4, 7, 11]), null, null, 'C', 'maj');
+ * const candidates = detectChords(new Set([0, 4, 7, 11]));
  * console.log(candidates[0].name); // "CMaj7"
  * console.log(candidates[0].score); // 高いスコア（ダイアトニック+完全一致）
  */
-export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyName=null, keyMode=null){
+export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null){
   if(pitches.size===0) return [];
   const pcs=[...pitches].sort((a,b)=>a-b);
   const pcsSet=new Set(pcs);
@@ -509,11 +496,12 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
 
   for(const root of candidateRoots){
     for(const ch of PATTERNS){
-      let corePCs = uniq((ch.core||[]).map(iv=>pc(root+iv)));
-      let optPCs = uniq((ch.opt||[]).map(iv=>pc(root+iv)));
-      optPCs = optPCs.filter(p=>!corePCs.includes(p));
-      let relaxedOpt = new Set();
-      ({ corePCs, optPCs, relaxedOpt } = applyOptionalFifth(corePCs, optPCs, root));
+      const corePCs = uniq((ch.core||[]).map(iv=>pc(root+iv)));
+      const optPCs = uniq((ch.opt||[]).map(iv=>pc(root+iv))).filter(p=>!corePCs.includes(p));
+      const isParen = /\(.*\)/.test(ch.name);
+      // 括弧なしパターンはopt音の不在を許容（例: CΔ7でGがなくてもexact）
+      // 括弧ありパターン（C7(b9)等）はテンション音の存在を要求
+      const relaxedOpt = isParen ? new Set() : new Set(optPCs);
 
       const coreSet=new Set(corePCs);
       const optSet =new Set(optPCs);
@@ -543,25 +531,34 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
 
       /* 加算式スコア */
       let score = 0;
-      if(exact) score += SCORE_EXACT_MATCH;
-      else if(optMiss) score += SCORE_OPT_MISS;
-      score += presentCore.length * SCORE_BONUS.coreHit;
-      score += presentOpt.length * SCORE_BONUS.optHit;
-      score -= missingCore.length * SCORE_BONUS.coreMiss;
-      score -= missingOpt.length * SCORE_BONUS.optMiss;
-      score -= extras.length * SCORE_BONUS.extra;
-      if(forcedRootPC===root) score += SCORE_BONUS.forcedRoot;
+      const baseBreakdown = [];
+
+      const matchVal = exact ? SCORE_EXACT_MATCH : (optMiss ? SCORE_OPT_MISS : 0);
+      score += matchVal;
+      baseBreakdown.push({ label: "match", detail: exact ? "exact" : (optMiss ? "opt-miss" : "partial"), value: matchVal });
+
+      if(presentCore.length) { const v = presentCore.length * SCORE_BONUS.coreHit; score += v; baseBreakdown.push({ label: "core", detail: `×${presentCore.length}`, value: v }); }
+      if(presentOpt.length)  { const v = presentOpt.length  * SCORE_BONUS.optHit;  score += v; baseBreakdown.push({ label: "opt",  detail: `×${presentOpt.length}`,  value: v }); }
+      if(missingCore.length) { const v = missingCore.length * SCORE_BONUS.coreMiss; score -= v; baseBreakdown.push({ label: "coreMiss", detail: `×${missingCore.length}`, value: -v }); }
+      if(missingOpt.length)  { const v = missingOpt.length  * SCORE_BONUS.optMiss;  score -= v; baseBreakdown.push({ label: "optMiss",  detail: `×${missingOpt.length}`,  value: -v }); }
+      if(extras.length)      { const v = extras.length      * SCORE_BONUS.extra;    score -= v; baseBreakdown.push({ label: "extra",    detail: `×${extras.length}`,      value: -v }); }
+
+      const relaxedMissCount = optPCs.filter(p => relaxedOpt.has(p) && !pcsSet.has(p)).length;
+      if(relaxedMissCount) { const v = relaxedMissCount * SCORE_BONUS.relaxedMiss; score -= v; baseBreakdown.push({ label: "rMiss", detail: `×${relaxedMissCount}`, value: -v }); }
+
+      if(forcedRootPC===root) { score += SCORE_BONUS.forcedRoot; baseBreakdown.push({ label: "forced", detail: "", value: SCORE_BONUS.forcedRoot }); }
 
       /* ▼ テンション系の順位を低めに（括弧や 9/11/13 を含む名前） */
       const nm = ch.name;
-      const isParen = /\(.*\)/.test(nm);
       const hasTensionNumber = /(^|[^A-Za-z])(9|11|13)\b/.test(nm);
       const rootPresent = pcsSet.has(root);
       if(isParen){
         score -= SCORE_BONUS.parenPenalty;
-        if(!rootPresent) score -= SCORE_BONUS.parenMissingRoot;
+        baseBreakdown.push({ label: "paren", detail: "", value: -SCORE_BONUS.parenPenalty });
+        if(!rootPresent) { score -= SCORE_BONUS.parenMissingRoot; baseBreakdown.push({ label: "noRoot", detail: "", value: -SCORE_BONUS.parenMissingRoot }); }
       }else if(hasTensionNumber){
         score -= SCORE_BONUS.tensionPenalty;
+        baseBreakdown.push({ label: "tension", detail: "", value: -SCORE_BONUS.tensionPenalty });
       }
 
       // ▼ Triad→7th の持ち上げ（例: C・E・G で C7 / Cmaj7 も候補へ）
@@ -570,14 +567,10 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
       const triadCovered = triadMajor.every(p=>pcsSet.has(p)) || triadMinor.every(p=>pcsSet.has(p));
       const isSus = /7sus[24]/i.test(nm);
       const isSeventhNominal = /\b(Maj7|m7|mMaj7|7)\b/i.test(nm) && !isSus;
-      if(triadCovered && isSeventhNominal) score += SCORE_BONUS.triadToSeventh;
+      if(triadCovered && isSeventhNominal) { score += SCORE_BONUS.triadToSeventh; baseBreakdown.push({ label: "triad→7", detail: "", value: SCORE_BONUS.triadToSeventh }); }
 
-      // Select root names:
-      // - key specified: choose one spelling based on key
-      // - key unspecified: keep both enharmonic families for black-key roots
-      const rootNames = (keyName && keyMode)
-        ? [selectRootNameForPC(root, keyName, keyMode)]
-        : rootNamesForPC(root);
+      // 常に異名同音を両方生成し、キー由来のスペルはペナルティで順位を下げる
+      const rootNames = rootNamesForPC(root);
 
       for (const rn of rootNames) {
         const fullName = rn + ch.name;
@@ -591,6 +584,10 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
         const adjScore = score + famBoost + keyBoost - keySpellingPenalty;
 
         const tones = buildChordSpelling(rn, ch);
+        const scoreBreakdown = baseBreakdown.slice();
+        scoreBreakdown.push({ label: "family", detail: fam, value: famBoost });
+        if(keyBoost !== 0) scoreBreakdown.push({ label: "keyBoost", detail: "", value: keyBoost });
+        if(keySpellingPenalty !== 0) scoreBreakdown.push({ label: "spell", detail: "", value: -keySpellingPenalty });
         results.push({
           name: fullName,
           root, exact, optMiss,
@@ -602,7 +599,8 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
           coreLen: corePCs.length,
           presentSet: pcsSet,
           missingCore, missingOpt, extras,
-          optTonePCs: optPCs
+          optTonePCs: optPCs,
+          scoreBreakdown,
         });
       }
     }

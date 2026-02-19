@@ -388,8 +388,37 @@ select {
 }
 
 .candidate-meta {
-  font-size: 16px;
   color: var(--muted);
+}
+
+.meta-grid {
+  width: 130px;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0 8px;
+  font-size: 11px;
+  font-family: monospace;
+  line-height: 1.5;
+}
+
+.meta-grid .meta-detail {
+  color: var(--muted);
+}
+
+.meta-grid .meta-value {
+  text-align: right;
+}
+
+.meta-sep-row {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--muted);
+  margin: 2px 0;
+  opacity: 0.4;
+}
+
+.meta-grid .meta-total {
+  color: var(--fg);
+  font-weight: bold;
 }
 
 .hide-tones .candidate-tones {
@@ -433,6 +462,20 @@ body.piano-visible .held-notes {
 }
 
 body.piano-visible .floating-btn-bottom {
+  bottom: calc(var(--piano-bar-h) + var(--floating-botttom));
+}
+
+.key-indicator {
+  position: fixed;
+  left: 20px;
+  bottom: var(--floating-botttom);
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+body.piano-visible .key-indicator {
   bottom: calc(var(--piano-bar-h) + var(--floating-botttom));
 }
 

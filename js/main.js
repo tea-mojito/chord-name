@@ -1,6 +1,6 @@
 import { initMIDI, setInputFilter, setChannelFilter, panic as midiPanic } from "./midi.js";
-import { detectChords } from "./chordRecognizer.js";
-import { formatChordDisplayName, noteNameToPC } from "./constants.js";
+import { detectChords, setKeyState } from "./chordRecognizer.js";
+import { formatChordDisplayName, noteNameToPC, setKeySignaturePreference } from "./constants.js";
 import { ensureAudioStarted, setSynthType, setMasterVolume, startNote, stopNote, allNotesOff } from "./audioEngine.js";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -46,12 +46,12 @@ const pianoWrapperEl = document.getElementById("pianoWrapper");
 const heldNotesEl = document.getElementById("heldNotes");
 const candidateListEl = document.getElementById("candidateList");
 const pianoKeyboardEl = document.getElementById("pianoKeyboard");
+const keyIndicatorEl = document.getElementById("keyIndicator");
 
 const heldNotes = new Set();
 let isLocked = false;
 let lockedCandidates = [];
-let keyName = null;
-let keyMode = null;
+
 let chordLabelPreset = "jazz";
 let stickyRenderedCandidates = [];
 let hasCandidates = false;
@@ -135,7 +135,20 @@ function createCandidateCard(item, isHistory = false) {
 
   const meta = document.createElement("div");
   meta.className = "candidate-meta";
-  meta.textContent = `match:${item.exact ? "exact" : (item.optMiss ? "opt-miss" : "partial")} / score:${item.score}`;
+  const metaGrid = document.createElement("div");
+  metaGrid.className = "meta-grid";
+  for (const r of (item.scoreBreakdown || [])) {
+    const lEl = document.createElement("div"); lEl.textContent = r.label;
+    const dEl = document.createElement("div"); dEl.textContent = r.detail; dEl.className = "meta-detail";
+    const vEl = document.createElement("div"); vEl.textContent = (r.value > 0 ? "+" : "") + r.value; vEl.className = "meta-value";
+    metaGrid.append(lEl, dEl, vEl);
+  }
+  const sep = document.createElement("div"); sep.className = "meta-sep-row";
+  const tLabel = document.createElement("div"); tLabel.textContent = "total"; tLabel.className = "meta-total";
+  const tEmpty = document.createElement("div");
+  const tVal = document.createElement("div"); tVal.textContent = String(item.score); tVal.className = "meta-value meta-total";
+  metaGrid.append(sep, tLabel, tEmpty, tVal);
+  meta.appendChild(metaGrid);
 
   card.append(name, tones, meta);
   return card;
@@ -170,7 +183,7 @@ function renderCandidates(list) {
 function getCandidatesFromHeld() {
   const pcs = new Set([...heldNotes].map(pc));
   if (!pcs.size) return [];
-  return detectChords(pcs, null, null, keyName, keyMode);
+  return detectChords(pcs);
 }
 
 function updateHistory(candidates) {
@@ -298,11 +311,6 @@ function refreshCandidates() {
   }
 
   cancelHistoryTimer();
-  if (hasCandidates) {
-    renderCandidates(stickyRenderedCandidates);
-    return;
-  }
-
   renderNoCandidates();
   stickyRenderedCandidates = [];
   hasCandidates = false;
@@ -372,19 +380,21 @@ function syncKeySelectUI(value) {
 function applyKeySelection(value) {
   const v = value || "";
   if (!v) {
-    keyName = null;
-    keyMode = null;
+    setKeyState({ keySignaturePref: null, neutralKeyBase: null, keyTonicPC: null, keyMode: null, keySelMode: 'manual', currentKeyName: null, currentKeyMode: null });
     localStorage.removeItem(STORAGE_KEYS.keySel);
     syncKeySelectUI("");
+    if (keyIndicatorEl) keyIndicatorEl.textContent = "key:none";
     refreshCandidates();
     return;
   }
 
   const [name, mode] = v.split(":");
-  keyName = name;
-  keyMode = mode === "min" ? "min_nat" : "maj";
+  const keyModeStr = mode === "min" ? "min_nat" : "maj";
+  const { keySignaturePref, neutralKeyBase } = setKeySignaturePreference(name, keyModeStr);
+  setKeyState({ keySignaturePref, neutralKeyBase, keyTonicPC: noteNameToPC(name), keyMode: keyModeStr, keySelMode: 'manual', currentKeyName: name, currentKeyMode: mode });
   localStorage.setItem(STORAGE_KEYS.keySel, v);
   syncKeySelectUI(v);
+  if (keyIndicatorEl) keyIndicatorEl.textContent = `key:${name}${mode === "min" ? "m" : ""}`;
   refreshCandidates();
 }
 
