@@ -15,6 +15,7 @@
   --floating-gap: 15px;
   --floating-botttom: 20px;
   --floating-size: 30px;
+  --piano-bar-h: 60px;
 }
 
 * { box-sizing: border-box; }
@@ -302,7 +303,8 @@ select {
 .held-notes {
   /* min-height: 24px; */
   position: fixed;
-  left: 10px;
+  left: auto;
+  right: 0px;
   bottom: 10px;
   z-index: 400;
   padding: 8px 20px;
@@ -351,8 +353,38 @@ select {
   margin-bottom: 4px;
 }
 
+.candidate-tones .tone-held {
+  color: var(--accent);
+}
+
+.candidate-tones .tone-held-opt {
+  color: #7baaf7;
+}
+
 .candidate-tones .tone-missing {
   color: var(--danger);
+}
+
+.candidate-tones .tone-optional-miss {
+  color: var(--muted);
+}
+
+.candidate-tones .tone-history {
+  color: #c0c0c0;
+}
+
+.history-sep {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+}
+
+.card-history .candidate-name {
+  font-size: 22px;
+  color: #b8b8b8;
+}
+
+.card-history .candidate-tones {
+  color: #c0c0c0;
 }
 
 .candidate-meta {
@@ -379,6 +411,83 @@ select {
   padding: 12px;
   color: var(--muted);
   /* background: #fff; */
+}
+
+/* ===== Piano Keyboard ===== */
+.piano-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  /* background: var(--bg); */
+  padding: 8px 10px;
+}
+
+body.piano-visible .app {
+  padding-bottom: var(--piano-bar-h);
+}
+
+body.piano-visible .held-notes {
+  bottom: calc(var(--piano-bar-h) + 10px);
+}
+
+body.piano-visible .floating-btn-bottom {
+  bottom: calc(var(--piano-bar-h) + var(--floating-botttom));
+}
+
+.piano-keyboard {
+  position: relative;
+  height: 50px;
+  width: 100%;
+  user-select: none;
+}
+
+.piano-key {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 0 0 4px 4px;
+}
+
+.piano-white {
+  background: var(--bg);
+  border: 1.5px solid #bbb;
+  height: 100%;
+  z-index: 1;
+}
+
+.piano-black {
+  background: var(--bg);
+  border: 2px solid #bbb;
+  height: 62%;
+  z-index: 2;
+  border-radius: 0 0 3px 3px;
+}
+
+.piano-key-held.piano-white {
+  background: var(--accent);
+  border-color: #bbb;
+}
+
+.piano-key-held.piano-black {
+  background: var(--accent);
+  border-color: #bbb;
+}
+
+.piano-key-label {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: #aaa;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.piano-key-held .piano-key-label {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 @media (max-width: 599px) {

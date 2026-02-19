@@ -84,36 +84,10 @@ export function setKeyState({
 }
 
 /* ====== 表示名で除外するブラックリスト規則 ====== */
-function shouldHideName(name){
+/* キー由来の異名同音フィルタはスコアペナルティに移行（computeKeySpellingPenalty 参照） */
+function shouldAlwaysHide(name){
   // 先頭のルート名を除去（C, Db, F#, E# など）
   const base = name.replace(/^[A-G](?:#|b|x)?/i,"");
-  // ▼ Key-based enharmonic pruning
-  try{
-    if(keySignaturePref!==undefined){
-      const m = name.match(/^[A-G](?:#|b)?/i);
-      if(m){
-        const rn = m[0];
-        const acc = rn.includes('#') ? '#' : (rn.includes('b') ? 'b' : '');
-        const p = noteNameToPC(rn);
-        const isBlack = (p===1||p===3||p===6||p===8||p===10);
-        if(isBlack && acc){
-          if(keySignaturePref==='sharp' && acc==='b') return true;  // hide flats in sharp keys
-          if(keySignaturePref==='flat'  && acc==='#') return true;  // hide sharps in flat keys
-          if(keySignaturePref===null){ // neutral (C maj / A min)
-            const isNeutralC = (neutralKeyBase==='C' && keyMode==='maj');
-            const isNeutralA = (neutralKeyBase==='A' && keyMode==='min');
-            if(isNeutralC || isNeutralA){
-              if(p===6){ if(acc==='b') return true; }        // prefer F# over Gb
-              else { if(acc==='#') return true; }            // prefer Db/Eb/Ab/Bb over sharps
-            }
-          }
-        }
-      }
-    }
-  }catch(e){
-    console.warn('[ChordRecognizer] Key/note name filtering error in shouldHideName:', name, e);
-  }
-
 
   // 既存の除外
   if(/add7/i.test(base)) return true;                        // 例: add7(9)
@@ -171,6 +145,37 @@ function shouldHideName(name){
   if(/^(?:m6)\(\s*13\s*\)$/i.test(base)) return true;
 
   return false;
+}
+
+/* ====== キー由来の異名同音スペルに対するスコアペナルティ ====== */
+function computeKeySpellingPenalty(name){
+  const KEY_SPELLING_PENALTY = 200;
+  try{
+    if(keySignaturePref!==undefined){
+      const m = name.match(/^[A-G](?:#|b)?/i);
+      if(m){
+        const rn = m[0];
+        const acc = rn.includes('#') ? '#' : (rn.includes('b') ? 'b' : '');
+        const p = noteNameToPC(rn);
+        const isBlack = (p===1||p===3||p===6||p===8||p===10);
+        if(isBlack && acc){
+          if(keySignaturePref==='sharp' && acc==='b') return KEY_SPELLING_PENALTY;
+          if(keySignaturePref==='flat'  && acc==='#') return KEY_SPELLING_PENALTY;
+          if(keySignaturePref===null){
+            const isNeutralC = (neutralKeyBase==='C' && keyMode==='maj');
+            const isNeutralA = (neutralKeyBase==='A' && keyMode==='min');
+            if(isNeutralC || isNeutralA){
+              if(p===6){ if(acc==='b') return KEY_SPELLING_PENALTY; }
+              else { if(acc==='#') return KEY_SPELLING_PENALTY; }
+            }
+          }
+        }
+      }
+    }
+  }catch(e){
+    console.warn('[ChordRecognizer] computeKeySpellingPenalty error:', name, e);
+  }
+  return 0;
 }
 
 /* ==== Family ranking (rewritten: table-driven) ==== */
@@ -576,13 +581,14 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
 
       for (const rn of rootNames) {
         const fullName = rn + ch.name;
-        if(shouldHideName(fullName)) continue;
+        if(shouldAlwaysHide(fullName)) continue;
+        const keySpellingPenalty = computeKeySpellingPenalty(fullName);
 
         // ▼ 家族優先の加点を付与
         const fam = familyOf(fullName);
         const famBoost = FAMILY_WEIGHT[fam] || 0;
         const keyBoost = computeKeyBoost(root, fullName);
-        const adjScore = score + famBoost + keyBoost;
+        const adjScore = score + famBoost + keyBoost - keySpellingPenalty;
 
         const tones = buildChordSpelling(rn, ch);
         results.push({
@@ -595,7 +601,8 @@ export function detectChords(pitches, forcedRootPC=null, lowestBassPC=null, keyN
           tones,
           coreLen: corePCs.length,
           presentSet: pcsSet,
-          missingCore, missingOpt, extras
+          missingCore, missingOpt, extras,
+          optTonePCs: optPCs
         });
       }
     }

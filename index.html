@@ -94,13 +94,6 @@
             </div>
             <div class="ui-col-right">
               <div class="inline-group">
-                <label>LOOSE</label>
-                <select id="candidateFilterSel">
-                  <option value="all">ON</option>
-                  <option value="exact" selected>OFF</option>
-                </select>
-              </div>
-              <div class="inline-group">
                 <label for="showTonesSel">TONES</label>
                 <select id="showTonesSel">
                   <option value="on" selected>Show</option>
@@ -119,6 +112,27 @@
                 <select id="showHeldSel">
                   <option value="on" selected>Show</option>
                   <option value="off">Hide</option>
+                </select>
+              </div>
+              <div class="inline-group">
+                <label for="showHistSel">HIST</label>
+                <select id="showHistSel">
+                  <option value="on" selected>Show</option>
+                  <option value="off">Hide</option>
+                </select>
+              </div>
+              <div class="inline-group">
+                <label for="showPianoSel">PIANO</label>
+                <select id="showPianoSel">
+                  <option value="on" selected>Show</option>
+                  <option value="off">Hide</option>
+                </select>
+              </div>
+              <div class="inline-group">
+                <label for="showPianoRangeSel">RANGE</label>
+                <select id="showPianoRangeSel">
+                  <option value="normal" selected>C2-C7</option>
+                  <option value="wide">C1-C8</option>
                 </select>
               </div>
             </div>
@@ -149,11 +163,18 @@
       <button id="lockBtn" type="button" class="floating-btn lock-btn text-action" aria-pressed="false" aria-label="Lock" title="Lock">
         <span class="material-symbols-rounded" aria-hidden="true">lock</span>
       </button>
+      <button id="clearHistoryBtn" type="button" class="floating-btn text-action" aria-label="Clear History" title="Clear History">
+        <span class="material-symbols-rounded" aria-hidden="true">cleaning_services</span>
+      </button>
     </div>
 
     <button id="fullscreenBtn" type="button" class="floating-btn floating-btn-bottom text-action" aria-label="Fullscreen" title="Fullscreen">
       <span class="material-symbols-rounded" aria-hidden="true">fullscreen</span>
     </button>
+
+    <div id="pianoWrapper" class="piano-wrapper">
+      <div id="pianoKeyboard" class="piano-keyboard"></div>
+    </div>
   </div>
 
   <script type="module" src="js/main.js"></script>
