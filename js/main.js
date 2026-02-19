@@ -47,6 +47,7 @@ const heldNotesEl = document.getElementById("heldNotes");
 const candidateListEl = document.getElementById("candidateList");
 const pianoKeyboardEl = document.getElementById("pianoKeyboard");
 const keyIndicatorEl = document.getElementById("keyIndicator");
+const keyPickerPopupEl = document.getElementById("keyPickerPopup");
 
 const heldNotes = new Set();
 let isLocked = false;
@@ -405,20 +406,21 @@ function applyKeySelectionFromUI(source) {
     if (!keyMajorSel.value) {
       keyMinorSel.value = "";
       applyKeySelection("");
-      return;
+    } else {
+      keyMinorSel.value = "";
+      applyKeySelection(keyMajorSel.value);
     }
-    keyMinorSel.value = "";
-    applyKeySelection(keyMajorSel.value);
-    return;
+  } else {
+    if (!keyMinorSel.value) {
+      keyMajorSel.value = "";
+      applyKeySelection("");
+    } else {
+      keyMajorSel.value = "";
+      applyKeySelection(keyMinorSel.value);
+    }
   }
 
-  if (!keyMinorSel.value) {
-    keyMajorSel.value = "";
-    applyKeySelection("");
-    return;
-  }
-  keyMajorSel.value = "";
-  applyKeySelection(keyMinorSel.value);
+  if (keyPickerPopupEl) keyPickerPopupEl.hidden = true;
 }
 
 function buildPianoKeyboard() {
@@ -521,6 +523,16 @@ function installEvents() {
   togglePanelBtn?.addEventListener("click", () => {
     isPanelOpen = !isPanelOpen;
     controlPanelEl?.classList.toggle("collapsed", !isPanelOpen);
+  });
+
+  keyIndicatorEl?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (keyPickerPopupEl) keyPickerPopupEl.hidden = !keyPickerPopupEl.hidden;
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!keyPickerPopupEl || keyPickerPopupEl.hidden) return;
+    if (!keyPickerPopupEl.contains(e.target)) keyPickerPopupEl.hidden = true;
   });
 
   keyMajorSel?.addEventListener("change", () => applyKeySelectionFromUI("major"));

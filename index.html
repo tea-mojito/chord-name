@@ -59,29 +59,6 @@
         <section class="option-col" id="option-ui">
           <div class="ui-cols">
             <div class="ui-col-left">
-              <div class="key-section">
-                <label class="key-section-label">KEY</label>
-                <div class="inline-group key-group">
-                  <label for="keyMajorSel">Maj</label>
-                  <select id="keyMajorSel">
-                    <option value="" selected>-</option>
-                    <option value="C:maj">C</option><option value="G:maj">G</option><option value="D:maj">D</option><option value="A:maj">A</option>
-                    <option value="E:maj">E</option><option value="B:maj">B</option><option value="F#:maj">F#</option><option value="Gb:maj">Gb</option>
-                    <option value="Db:maj">Db</option><option value="Ab:maj">Ab</option><option value="Eb:maj">Eb</option><option value="Bb:maj">Bb</option>
-                    <option value="F:maj">F</option>
-                  </select>
-                </div>
-                <div class="inline-group key-group">
-                  <label for="keyMinorSel">Min</label>
-                  <select id="keyMinorSel">
-                    <option value="" selected>-</option>
-                    <option value="A:min">Am</option><option value="E:min">Em</option><option value="B:min">Bm</option><option value="F#:min">F#m</option>
-                    <option value="C#:min">C#m</option><option value="G#:min">G#m</option><option value="D#:min">D#m</option><option value="Eb:min">Ebm</option>
-                    <option value="Bb:min">Bbm</option><option value="F:min">Fm</option><option value="C:min">Cm</option><option value="G:min">Gm</option>
-                    <option value="D:min">Dm</option>
-                  </select>
-                </div>
-              </div>
               <div class="inline-group">
                 <label for="labelPresetSel" class="icon-label" aria-label="表記" title="表記">
                   <span class="material-symbols-rounded" aria-hidden="true">edit_note</span>
@@ -91,8 +68,6 @@
                   <option value="general">General</option>
                 </select>
               </div>
-            </div>
-            <div class="ui-col-right">
               <div class="inline-group">
                 <label for="showTonesSel">TONES</label>
                 <select id="showTonesSel">
@@ -101,22 +76,17 @@
                 </select>
               </div>
               <div class="inline-group">
-                <label for="showMetaSel">META</label>
-                <select id="showMetaSel">
-                  <option value="off" selected>Hide</option>
-                  <option value="on">Show</option>
-                </select>
-              </div>
-              <div class="inline-group">
-                <label for="showHeldSel">HELD</label>
-                <select id="showHeldSel">
+                <label for="showHistSel">HIST</label>
+                <select id="showHistSel">
                   <option value="on" selected>Show</option>
                   <option value="off">Hide</option>
                 </select>
               </div>
+            </div>
+            <div class="ui-col-right">
               <div class="inline-group">
-                <label for="showHistSel">HIST</label>
-                <select id="showHistSel">
+                <label for="showHeldSel">HELD</label>
+                <select id="showHeldSel">
                   <option value="on" selected>Show</option>
                   <option value="off">Hide</option>
                 </select>
@@ -133,6 +103,13 @@
                 <select id="showPianoRangeSel">
                   <option value="normal" selected>C2-C7</option>
                   <option value="wide">C1-C8</option>
+                </select>
+              </div>
+              <div class="inline-group">
+                <label for="showMetaSel">META</label>
+                <select id="showMetaSel">
+                  <option value="off" selected>Hide</option>
+                  <option value="on">Show</option>
                 </select>
               </div>
             </div>
@@ -169,6 +146,45 @@
     </div>
 
     <div id="keyIndicator" class="key-indicator">key:none</div>
+
+    <div id="keyPickerPopup" class="key-picker-popup" hidden>
+      <div class="inline-group">
+        <label for="keyMajorSel">Maj</label>
+        <select id="keyMajorSel">
+          <option value="">-</option>
+          <option value="C:maj">C</option>
+          <option value="G:maj">G</option>
+          <option value="D:maj">D</option>
+          <option value="A:maj">A</option>
+          <option value="E:maj">E</option>
+          <option value="B:maj">B</option>
+          <option value="F#:maj">F#</option>
+          <option value="Db:maj">Db</option>
+          <option value="Ab:maj">Ab</option>
+          <option value="Eb:maj">Eb</option>
+          <option value="Bb:maj">Bb</option>
+          <option value="F:maj">F</option>
+        </select>
+      </div>
+      <div class="inline-group">
+        <label for="keyMinorSel">Min</label>
+        <select id="keyMinorSel">
+          <option value="">-</option>
+          <option value="A:min">Am</option>
+          <option value="E:min">Em</option>
+          <option value="B:min">Bm</option>
+          <option value="F#:min">F#m</option>
+          <option value="C#:min">C#m</option>
+          <option value="G#:min">G#m</option>
+          <option value="D#:min">D#m</option>
+          <option value="Bb:min">Bbm</option>
+          <option value="F:min">Fm</option>
+          <option value="C:min">Cm</option>
+          <option value="G:min">Gm</option>
+          <option value="D:min">Dm</option>
+        </select>
+      </div>
+    </div>
 
     <button id="fullscreenBtn" type="button" class="floating-btn floating-btn-bottom text-action" aria-label="Fullscreen" title="Fullscreen">
       <span class="material-symbols-rounded" aria-hidden="true">fullscreen</span>
