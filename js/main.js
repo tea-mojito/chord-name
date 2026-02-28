@@ -1,7 +1,7 @@
 import { initMIDI, setInputFilter, setChannelFilter, panic as midiPanic } from "./midi.js";
 import { detectChords, setKeyState } from "./chordRecognizer.js";
 import { formatChordDisplayName, noteNameToPC, setKeySignaturePreference } from "./constants.js";
-import { ensureAudioStarted, setSynthType, setMasterVolume, startNote, stopNote, allNotesOff } from "./audioEngine.js";
+import { ensureAudioStarted, setSynthType, setMasterVolume, startNote, stopNote, allNotesOff, loadVoiceSamples } from "./audioEngine.js";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -219,11 +219,11 @@ function scheduleHistoryUpdate() {
 function clearHistory() {
   candidateHistory = [];
   lastTopCandidateName = null;
-  if (isLocked) {
-    renderCandidates(lockedCandidates);
-  } else {
-    renderCandidates(stickyRenderedCandidates);
-  }
+  cancelHistoryTimer();
+  stickyRenderedCandidates = [];
+  lockedCandidates = [];
+  hasCandidates = false;
+  renderCandidates([]);
 }
 
 function applyShowPiano(show) {
@@ -384,7 +384,7 @@ function applyKeySelection(value) {
     setKeyState({ keySignaturePref: null, neutralKeyBase: null, keyTonicPC: null, keyMode: null, keySelMode: 'manual', currentKeyName: null, currentKeyMode: null });
     localStorage.removeItem(STORAGE_KEYS.keySel);
     syncKeySelectUI("");
-    if (keyIndicatorEl) keyIndicatorEl.textContent = "key:none";
+    if (keyIndicatorEl) keyIndicatorEl.textContent = "KEY:none";
     refreshCandidates();
     return;
   }
@@ -395,7 +395,7 @@ function applyKeySelection(value) {
   setKeyState({ keySignaturePref, neutralKeyBase, keyTonicPC: noteNameToPC(name), keyMode: keyModeStr, keySelMode: 'manual', currentKeyName: name, currentKeyMode: mode });
   localStorage.setItem(STORAGE_KEYS.keySel, v);
   syncKeySelectUI(v);
-  if (keyIndicatorEl) keyIndicatorEl.textContent = `key:${name}${mode === "min" ? "m" : ""}`;
+  if (keyIndicatorEl) keyIndicatorEl.textContent = `KEY:${name}${mode === "min" ? "m" : ""}`;
   refreshCandidates();
 }
 
@@ -531,8 +531,15 @@ function installEvents() {
   });
 
   document.addEventListener("click", (e) => {
-    if (!keyPickerPopupEl || keyPickerPopupEl.hidden) return;
-    if (!keyPickerPopupEl.contains(e.target)) keyPickerPopupEl.hidden = true;
+    if (keyPickerPopupEl && !keyPickerPopupEl.hidden) {
+      if (!keyPickerPopupEl.contains(e.target) && e.target !== keyIndicatorEl) {
+        keyPickerPopupEl.hidden = true;
+      }
+    }
+    if (isPanelOpen && controlPanelEl && !controlPanelEl.contains(e.target) && !togglePanelBtn?.contains(e.target)) {
+      isPanelOpen = false;
+      controlPanelEl.classList.add("collapsed");
+    }
   });
 
   keyMajorSel?.addEventListener("change", () => applyKeySelectionFromUI("major"));
@@ -673,6 +680,7 @@ function restoreSettings() {
 }
 
 function init() {
+  loadVoiceSamples();
   controlPanelEl?.classList.toggle("collapsed", !isPanelOpen);
   installEvents();
   updateFullscreenButtonVisibility();

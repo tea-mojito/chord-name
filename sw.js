@@ -1,4 +1,4 @@
-const CACHE_NAME = "chord-detector-v1";
+const CACHE_NAME = "chord-detector-v3";
 
 const FILES_TO_CACHE = [
   "./",
