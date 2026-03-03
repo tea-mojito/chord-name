@@ -17,7 +17,8 @@ const STORAGE_KEYS = {
   showHeld: "mvp:show_held",
   showHist: "mvp:show_hist",
   showPiano: "mvp:show_piano",
-  pianoRange: "mvp:piano_range"
+  pianoRange: "mvp:piano_range",
+  fontSize: "mvp:font_scale"
 };
 
 const midiStatusText = document.getElementById("midiStatusText");
@@ -48,6 +49,7 @@ const candidateListEl = document.getElementById("candidateList");
 const pianoKeyboardEl = document.getElementById("pianoKeyboard");
 const keyIndicatorEl = document.getElementById("keyIndicator");
 const keyPickerPopupEl = document.getElementById("keyPickerPopup");
+const fontSizeSlider = document.getElementById("fontSizeSlider");
 
 const heldNotes = new Set();
 let isLocked = false;
@@ -73,6 +75,54 @@ const HISTORY_DEBOUNCE_MS = 255;
 
 // Piano constants
 const PIANO_WHITE_PC = new Set([0, 2, 4, 5, 7, 9, 11]);
+const pianoPointerToMidi = new Map();
+const pianoVirtualHoldCounts = new Map();
+const keyboardPressedCodes = new Set();
+const KEYBOARD_CODE_TO_MIDI = new Map([
+  // C4 lane (JIS physical keys)
+  ["KeyQ", 60],        // C4
+  ["Digit2", 61],      // C#4
+  ["KeyW", 62],        // D4
+  ["Digit3", 63],      // D#4
+  ["KeyE", 64],        // E4
+  ["KeyR", 65],        // F4
+  ["Digit5", 66],      // F#4
+  ["KeyT", 67],        // G4
+  ["Digit6", 68],      // G#4
+  ["KeyY", 69],        // A4
+  ["Digit7", 70],      // A#4
+  ["KeyU", 71],        // B4
+  ["KeyI", 72],        // C5
+  ["Digit9", 73],      // C#5
+  ["KeyO", 74],        // D5
+  ["Digit0", 75],      // D#5
+  ["KeyP", 76],        // E5
+  ["BracketLeft", 77], // F5  (@)
+  ["Equal", 78],       // F#5 (^)
+  ["BracketRight", 79],// G5  ([)
+  ["IntlYen", 80],     // G#5 (\)
+  // C3 lane (JIS physical keys)
+  ["KeyZ", 48],        // C3
+  ["KeyS", 49],        // C#3
+  ["KeyX", 50],        // D3
+  ["KeyD", 51],        // D#3
+  ["KeyC", 52],        // E3
+  ["KeyV", 53],        // F3
+  ["KeyG", 54],        // F#3
+  ["KeyB", 55],        // G3
+  ["KeyH", 56],        // G#3
+  ["KeyN", 57],        // A3
+  ["KeyJ", 58],        // A#3
+  ["KeyM", 59],        // B3
+  ["Comma", 60],       // C4
+  ["KeyL", 61],        // C#4
+  ["Period", 62],      // D4
+  ["Semicolon", 63],   // D#4
+  ["Slash", 64],       // E4
+  ["IntlRo", 65],      // F4  (\)
+  ["Backslash", 66],   // F#4 (])
+  ["ShiftRight", 67]   // G4
+]);
 
 function pc(midi) {
   return ((midi % 12) + 12) % 12;
@@ -224,6 +274,13 @@ function clearHistory() {
   lockedCandidates = [];
   hasCandidates = false;
   renderCandidates([]);
+}
+
+function applyFontScale(value) {
+  const v = Math.max(0.5, Math.min(2, Number(value) || 1));
+  document.documentElement.style.setProperty("--chord-font-scale", String(v));
+  if (fontSizeSlider) fontSizeSlider.value = String(v);
+  localStorage.setItem(STORAGE_KEYS.fontSize, String(v));
 }
 
 function applyShowPiano(show) {
@@ -467,6 +524,155 @@ function updatePianoHighlight() {
   });
 }
 
+function resolveKeyboardMidi(event) {
+  if (KEYBOARD_CODE_TO_MIDI.has(event.code)) {
+    return KEYBOARD_CODE_TO_MIDI.get(event.code);
+  }
+
+  // Fallback for environments where JIS-specific codes are unavailable.
+  if (event.key === "\\") return 80;
+  if (event.key === "¥") return 80;
+  if (event.key === "]") return 66;
+  return null;
+}
+
+function shouldIgnoreKeyboardEvent(event) {
+  const target = event.target;
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+function installComputerKeyboardEvents() {
+  window.addEventListener("keydown", (event) => {
+    if (shouldIgnoreKeyboardEvent(event)) return;
+    const midi = resolveKeyboardMidi(event);
+    if (midi == null) return;
+    event.preventDefault();
+    if (event.repeat || keyboardPressedCodes.has(event.code)) return;
+    keyboardPressedCodes.add(event.code);
+    onNoteOn(midi);
+  });
+
+  window.addEventListener("keyup", (event) => {
+    const midi = resolveKeyboardMidi(event);
+    if (midi == null) return;
+    event.preventDefault();
+    if (!keyboardPressedCodes.has(event.code)) return;
+    keyboardPressedCodes.delete(event.code);
+    onNoteOff(midi);
+  });
+
+  window.addEventListener("blur", () => {
+    const releasingCodes = [...keyboardPressedCodes];
+    keyboardPressedCodes.clear();
+    for (const code of releasingCodes) {
+      const midi = KEYBOARD_CODE_TO_MIDI.get(code);
+      if (midi != null) onNoteOff(midi);
+    }
+  });
+}
+
+function midiFromPianoKeyElement(el) {
+  if (!el) return null;
+  const midi = Number(el.dataset.midi);
+  return Number.isFinite(midi) ? midi : null;
+}
+
+function findPianoKeyElementFromPoint(x, y) {
+  if (!pianoKeyboardEl) return null;
+  const target = document.elementFromPoint(x, y);
+  if (!target) return null;
+  const keyEl = target.closest?.(".piano-key");
+  if (!keyEl || !pianoKeyboardEl.contains(keyEl)) return null;
+  return keyEl;
+}
+
+function holdVirtualKey(midi) {
+  const count = (pianoVirtualHoldCounts.get(midi) || 0) + 1;
+  pianoVirtualHoldCounts.set(midi, count);
+  if (count === 1) {
+    onNoteOn(midi);
+  }
+}
+
+function releaseVirtualKeyByMidi(midi) {
+  const count = pianoVirtualHoldCounts.get(midi) || 0;
+  if (count <= 1) {
+    pianoVirtualHoldCounts.delete(midi);
+    onNoteOff(midi);
+    return;
+  }
+  pianoVirtualHoldCounts.set(midi, count - 1);
+}
+
+function pressVirtualKey(pointerId, midi) {
+  const currentMidi = pianoPointerToMidi.get(pointerId);
+  if (currentMidi === midi) return;
+  if (currentMidi != null) {
+    releaseVirtualKeyByMidi(currentMidi);
+  }
+  pianoPointerToMidi.set(pointerId, midi);
+  holdVirtualKey(midi);
+}
+
+function releaseVirtualKeyByPointer(pointerId) {
+  const midi = pianoPointerToMidi.get(pointerId);
+  if (midi == null) return;
+  pianoPointerToMidi.delete(pointerId);
+  releaseVirtualKeyByMidi(midi);
+}
+
+function moveVirtualKey(pointerId, clientX, clientY) {
+  if (!pianoPointerToMidi.has(pointerId)) return;
+  const keyEl = findPianoKeyElementFromPoint(clientX, clientY);
+  if (!keyEl) {
+    releaseVirtualKeyByPointer(pointerId);
+    return;
+  }
+  const midi = midiFromPianoKeyElement(keyEl);
+  if (midi == null) {
+    releaseVirtualKeyByPointer(pointerId);
+    return;
+  }
+  pressVirtualKey(pointerId, midi);
+}
+
+function installPianoPointerEvents() {
+  if (!pianoKeyboardEl) return;
+
+  pianoKeyboardEl.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const keyEl = e.target.closest?.(".piano-key");
+    const midi = midiFromPianoKeyElement(keyEl);
+    if (midi == null) return;
+    e.preventDefault();
+    pressVirtualKey(e.pointerId, midi);
+    try {
+      pianoKeyboardEl.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  });
+
+  pianoKeyboardEl.addEventListener("pointermove", (e) => {
+    if (!pianoPointerToMidi.has(e.pointerId)) return;
+    e.preventDefault();
+    moveVirtualKey(e.pointerId, e.clientX, e.clientY);
+  });
+
+  const releaseByEvent = (e) => releaseVirtualKeyByPointer(e.pointerId);
+  pianoKeyboardEl.addEventListener("pointerup", releaseByEvent);
+  pianoKeyboardEl.addEventListener("pointercancel", releaseByEvent);
+  pianoKeyboardEl.addEventListener("lostpointercapture", releaseByEvent);
+
+  window.addEventListener("blur", () => {
+    const pointerIds = [...pianoPointerToMidi.keys()];
+    pointerIds.forEach((pointerId) => releaseVirtualKeyByPointer(pointerId));
+  });
+}
+
 function onNoteOn(midi) {
   clearNoteOffDebounce();
   ensureAudioStarted();
@@ -492,6 +698,9 @@ function onNoteOff(midi) {
 function onPanic() {
   clearNoteOffDebounce();
   cancelHistoryTimer();
+  pianoPointerToMidi.clear();
+  pianoVirtualHoldCounts.clear();
+  keyboardPressedCodes.clear();
   allNotesOff();
   heldNotes.clear();
   renderHeldNotes();
@@ -502,6 +711,9 @@ function onPanic() {
 }
 
 function installEvents() {
+  installPianoPointerEvents();
+  installComputerKeyboardEvents();
+
   midiBtn?.addEventListener("click", async () => {
     await ensureAudioStarted();
     await initMIDI({
@@ -566,6 +778,10 @@ function installEvents() {
   });
   showPianoRangeSel?.addEventListener("change", (e) => {
     applyPianoRange(e.target.value);
+  });
+
+  fontSizeSlider?.addEventListener("input", (e) => {
+    applyFontScale(e.target.value);
   });
 
   clearHistoryBtn?.addEventListener("click", () => {
@@ -677,6 +893,9 @@ function restoreSettings() {
 
   const savedPianoRange = localStorage.getItem(STORAGE_KEYS.pianoRange) || "normal";
   applyPianoRange(savedPianoRange);
+
+  const savedFontScale = localStorage.getItem(STORAGE_KEYS.fontSize) || "1";
+  applyFontScale(savedFontScale);
 }
 
 function init() {

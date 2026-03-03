@@ -1,4 +1,5 @@
 :root {
+  --chord-font-scale: 1;
   --bg: #f1f3f4;
   --surface: #f8f9fb;
   --text: #202124;
@@ -113,6 +114,10 @@ html, body {
 }
 
 .inline-group--volume input[type="range"] {
+  width: 120px;
+}
+
+.inline-group--font-size input[type="range"] {
   width: 120px;
 }
 
@@ -339,18 +344,18 @@ select {
 }
 
 .match-exact .candidate-name{
-  font-size: 35px;
+  font-size: calc(35px * var(--chord-font-scale));
   color: #2b3a55;
 }
 
 .match-partial .candidate-name{
-  font-size: 25px;
+  font-size: calc(25px * var(--chord-font-scale));
   color: #949494;
 }
 
 .candidate-tones {
   font-family: "Josefin Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-  font-size: 18px;
+  font-size: calc(18px * var(--chord-font-scale));
   color: #2f3847;
   margin-bottom: 4px;
 }
@@ -381,7 +386,7 @@ select {
 }
 
 .card-history .candidate-name {
-  font-size: 22px;
+  font-size: calc(22px * var(--chord-font-scale));
   color: #b8b8b8;
 }
 
@@ -500,12 +505,14 @@ body.piano-visible .floating-btn-bottom {
   height: 50px;
   width: 100%;
   user-select: none;
+  touch-action: none;
 }
 
 .piano-key {
   position: absolute;
   box-sizing: border-box;
   border-radius: 0 0 4px 4px;
+  cursor: pointer;
 }
 
 .piano-white {
