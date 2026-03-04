@@ -8,6 +8,7 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 const STORAGE_KEYS = {
   keySel: "mvp:key_sel",
   lock: "mvp:candidate_lock",
+  midiInput: "mvp:midi_input",
   labelPreset: "mvp:label_preset",
   wave: "mvp:wave",
   volume: "mvp:volume",
@@ -16,6 +17,7 @@ const STORAGE_KEYS = {
   showMeta: "mvp:show_meta",
   showHeld: "mvp:show_held",
   showHist: "mvp:show_hist",
+  showLoose: "mvp:show_loose",
   showPiano: "mvp:show_piano",
   pianoRange: "mvp:piano_range",
   fontSize: "mvp:font_scale"
@@ -40,6 +42,7 @@ const showTonesSel = document.getElementById("showTonesSel");
 const showMetaSel = document.getElementById("showMetaSel");
 const showHeldSel = document.getElementById("showHeldSel");
 const showHistSel = document.getElementById("showHistSel");
+const showLooseSel = document.getElementById("showLooseSel");
 const showPianoSel = document.getElementById("showPianoSel");
 const showPianoRangeSel = document.getElementById("showPianoRangeSel");
 const controlPanelEl = document.querySelector(".control-panel");
@@ -55,7 +58,7 @@ const heldNotes = new Set();
 let isLocked = false;
 let lockedCandidates = [];
 
-let chordLabelPreset = "jazz";
+let chordLabelPreset = "general";
 let stickyRenderedCandidates = [];
 let hasCandidates = false;
 let lastHeldCount = 0;
@@ -68,6 +71,7 @@ let lastVolumeBeforeMute = 1;
 let candidateHistory = [];
 let lastTopCandidateName = null;
 let showHist = true;
+let showLoose = true;
 let showPiano = true;
 let pianoRange = "normal";
 let historyTimer = null;
@@ -146,14 +150,20 @@ function renderHeldNotes() {
 
 function createCandidateCard(item, isHistory = false) {
   const card = document.createElement("article");
-  const matchClass = item.exact ? "match-exact" : "match-partial";
+  const matchClass =
+    item.candidateKind === "exact"
+      ? "match-exact"
+      : item.candidateKind === "loose"
+        ? "match-loose"
+        : "match-partial";
   card.className = isHistory
     ? "candidate-card match-exact card-history"
     : `candidate-card ${matchClass}`;
 
   const name = document.createElement("h3");
   name.className = "candidate-name";
-  name.textContent = formatChordDisplayName(item.name, chordLabelPreset);
+  const chordLabel = formatChordDisplayName(item.name, chordLabelPreset);
+  name.append(chordLabel);
 
   const tones = document.createElement("div");
   tones.className = "candidate-tones";
@@ -205,6 +215,17 @@ function createCandidateCard(item, isHistory = false) {
   return card;
 }
 
+function createGroupMarker(iconName, markerClass = "") {
+  const marker = document.createElement("div");
+  marker.className = `candidate-group-marker ${markerClass}`.trim();
+  const icon = document.createElement("span");
+  icon.className = "material-symbols-rounded candidate-group-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = iconName;
+  marker.appendChild(icon);
+  return marker;
+}
+
 function renderCandidates(list) {
   candidateListEl.innerHTML = "";
   const hasHistory = showHist && candidateHistory.length > 0;
@@ -217,14 +238,26 @@ function renderCandidates(list) {
     return;
   }
 
-  list.slice(0, 12).forEach((item) => {
+  const mainList = list.slice(0, 12);
+  const primaryList = mainList.filter((item) => item.candidateKind !== "loose");
+  const looseList = mainList.filter((item) => item.candidateKind === "loose");
+
+  primaryList.forEach((item) => {
     candidateListEl.appendChild(createCandidateCard(item, false));
   });
+
+  if (looseList.length > 0) {
+    candidateListEl.appendChild(createGroupMarker("help", "loose-marker"));
+    looseList.forEach((item) => {
+      candidateListEl.appendChild(createCandidateCard(item, false));
+    });
+  }
 
   if (showHist && candidateHistory.length > 0) {
     const sep = document.createElement("div");
     sep.className = "history-sep";
     candidateListEl.appendChild(sep);
+    candidateListEl.appendChild(createGroupMarker("schedule", "history-marker"));
     candidateHistory.forEach((item) => {
       candidateListEl.appendChild(createCandidateCard(item, true));
     });
@@ -235,6 +268,26 @@ function getCandidatesFromHeld() {
   const pcs = new Set([...heldNotes].map(pc));
   if (!pcs.size) return [];
   return detectChords(pcs);
+}
+
+function buildDisplayCandidates(allCandidates) {
+  const filtered = allCandidates.filter((c) => (c.extras || []).length === 0);
+  const exact = [];
+  const optMiss = [];
+  const loose = [];
+
+  for (const c of filtered) {
+    if (c.exact) {
+      exact.push({ ...c, candidateKind: "exact" });
+    } else if (c.optMiss) {
+      optMiss.push({ ...c, candidateKind: "opt-miss" });
+    } else {
+      loose.push({ ...c, candidateKind: "loose" });
+    }
+  }
+
+  if (!showLoose) return exact.concat(optMiss);
+  return exact.concat(optMiss, loose);
 }
 
 function updateHistory(candidates) {
@@ -258,7 +311,7 @@ function scheduleHistoryUpdate() {
   historyTimer = setTimeout(() => {
     historyTimer = null;
     const liveCandidates = getCandidatesFromHeld();
-    const exactCandidates = liveCandidates.filter((c) => c.exact);
+    const exactCandidates = liveCandidates.filter((c) => c.exact && (c.extras || []).length === 0);
     if (exactCandidates.length) {
       updateHistory(exactCandidates);
       renderCandidates(stickyRenderedCandidates);
@@ -278,7 +331,9 @@ function clearHistory() {
 
 function applyFontScale(value) {
   const v = Math.max(0.5, Math.min(2, Number(value) || 1));
+  const candidateMinWidth = Math.max(110, Math.min(220, Math.round(160 * v)));
   document.documentElement.style.setProperty("--chord-font-scale", String(v));
+  document.documentElement.style.setProperty("--candidate-min-width", `${candidateMinWidth}px`);
   if (fontSizeSlider) fontSizeSlider.value = String(v);
   localStorage.setItem(STORAGE_KEYS.fontSize, String(v));
 }
@@ -310,8 +365,34 @@ function applyShowHist(show) {
   }
 }
 
+function applyShowLoose(show) {
+  showLoose = !!show;
+  if (showLooseSel) showLooseSel.value = show ? "on" : "off";
+  localStorage.setItem(STORAGE_KEYS.showLoose, show ? "on" : "off");
+  if (isLocked) {
+    lockedCandidates = buildDisplayCandidates(getCandidatesFromHeld());
+    renderCandidates(lockedCandidates);
+  } else {
+    refreshCandidates();
+  }
+}
+
 function renderNoCandidates() {
   renderCandidates([]);
+}
+
+function applySavedMidiInputSelection() {
+  const savedInputId = localStorage.getItem(STORAGE_KEYS.midiInput) || "";
+  if (!midiInputSel) return;
+  if (!savedInputId) {
+    midiInputSel.value = "";
+    setInputFilter("");
+    return;
+  }
+  const exists = [...midiInputSel.options].some((opt) => opt.value === savedInputId);
+  if (!exists) return;
+  midiInputSel.value = savedInputId;
+  setInputFilter(savedInputId);
 }
 
 function clearNoteOffDebounce() {
@@ -346,7 +427,7 @@ function refreshCandidates() {
     renderCandidates(stickyRenderedCandidates);
     return;
   }
-  if (heldCount < 3) {
+  if (heldCount < 2) {
     if (hasCandidates) {
       renderCandidates(stickyRenderedCandidates);
       return;
@@ -359,11 +440,20 @@ function refreshCandidates() {
   }
 
   const liveCandidates = getCandidatesFromHeld();
-  const exactCandidates = liveCandidates.filter((c) => c.exact);
+  const exactCandidates = liveCandidates.filter((c) => c.exact && (c.extras || []).length === 0);
+  const displayCandidates = buildDisplayCandidates(liveCandidates);
   if (exactCandidates.length) {
     scheduleHistoryUpdate();
-    renderCandidates(exactCandidates);
-    stickyRenderedCandidates = exactCandidates.slice();
+    renderCandidates(displayCandidates);
+    stickyRenderedCandidates = displayCandidates.slice();
+    hasCandidates = displayCandidates.length > 0;
+    return;
+  }
+
+  if (displayCandidates.length) {
+    cancelHistoryTimer();
+    renderCandidates(displayCandidates);
+    stickyRenderedCandidates = displayCandidates.slice();
     hasCandidates = true;
     return;
   }
@@ -379,7 +469,7 @@ function setLockState(next) {
   lockBtn?.classList.toggle("active", isLocked);
   lockBtn?.setAttribute("aria-pressed", String(isLocked));
   if (isLocked) {
-    lockedCandidates = getCandidatesFromHeld().filter((c) => c.exact);
+    lockedCandidates = buildDisplayCandidates(getCandidatesFromHeld());
   }
   localStorage.setItem(STORAGE_KEYS.lock, isLocked ? "on" : "off");
   refreshCandidates();
@@ -547,6 +637,7 @@ function shouldIgnoreKeyboardEvent(event) {
 function installComputerKeyboardEvents() {
   window.addEventListener("keydown", (event) => {
     if (shouldIgnoreKeyboardEvent(event)) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     const midi = resolveKeyboardMidi(event);
     if (midi == null) return;
     event.preventDefault();
@@ -556,6 +647,7 @@ function installComputerKeyboardEvents() {
   });
 
   window.addEventListener("keyup", (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     const midi = resolveKeyboardMidi(event);
     if (midi == null) return;
     event.preventDefault();
@@ -723,9 +815,15 @@ function installEvents() {
       onNoteOff,
       onPanic
     });
+    applySavedMidiInputSelection();
   });
 
-  midiInputSel?.addEventListener("change", (e) => setInputFilter(e.target.value));
+  midiInputSel?.addEventListener("change", (e) => {
+    const inputId = e.target.value || "";
+    setInputFilter(inputId);
+    if (inputId) localStorage.setItem(STORAGE_KEYS.midiInput, inputId);
+    else localStorage.removeItem(STORAGE_KEYS.midiInput);
+  });
   midiChSel?.addEventListener("change", (e) => setChannelFilter(e.target.value));
 
   panicBtn?.addEventListener("click", () => {
@@ -772,6 +870,9 @@ function installEvents() {
   });
   showHistSel?.addEventListener("change", (e) => {
     applyShowHist(e.target.value === "on");
+  });
+  showLooseSel?.addEventListener("change", (e) => {
+    applyShowLoose(e.target.value === "on");
   });
   showPianoSel?.addEventListener("change", (e) => {
     applyShowPiano(e.target.value === "on");
@@ -856,7 +957,7 @@ function restoreSettings() {
   localStorage.removeItem(STORAGE_KEYS.lock);
   setLockState(false);
 
-  const savedPreset = localStorage.getItem(STORAGE_KEYS.labelPreset) || "jazz";
+  const savedPreset = localStorage.getItem(STORAGE_KEYS.labelPreset) || "general";
   setChordLabelPreset(savedPreset);
 
   const savedWave = localStorage.getItem(STORAGE_KEYS.wave) || "triangle";
@@ -888,6 +989,9 @@ function restoreSettings() {
   const savedShowHist = localStorage.getItem(STORAGE_KEYS.showHist);
   applyShowHist(savedShowHist !== "off");
 
+  const savedShowLoose = localStorage.getItem(STORAGE_KEYS.showLoose);
+  applyShowLoose(savedShowLoose !== "off");
+
   const savedShowPiano = localStorage.getItem(STORAGE_KEYS.showPiano);
   applyShowPiano(savedShowPiano !== "off");
 
@@ -916,6 +1020,8 @@ function init() {
       onNoteOn,
       onNoteOff,
       onPanic
+    }).then(() => {
+      applySavedMidiInputSelection();
     });
   }
 

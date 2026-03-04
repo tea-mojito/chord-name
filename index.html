@@ -14,10 +14,9 @@
 </head>
 <body>
   <div class="app">
-    <header class="panel control-panel">
+    <header class="control-panel">
       <div class="options-grid">
         <section class="option-col" id="option-tone">
-
           <div class="inline-group">
             <label for="waveSel" class="icon-label" aria-label="音色" title="音色">
               <span class="material-symbols-rounded" aria-hidden="true">music_note</span>
@@ -66,8 +65,8 @@
                   <span class="material-symbols-rounded" aria-hidden="true">edit_note</span>
                 </label>
                 <select id="labelPresetSel">
-                  <option value="jazz" selected>Jazz</option>
-                  <option value="general">General</option>
+                  <option value="general" selected>General</option>
+                  <option value="jazz">Jazz</option>
                 </select>
               </div>
               <div class="inline-group">
@@ -80,6 +79,13 @@
               <div class="inline-group">
                 <label for="showHistSel">HIST</label>
                 <select id="showHistSel">
+                  <option value="on" selected>Show</option>
+                  <option value="off">Hide</option>
+                </select>
+              </div>
+              <div class="inline-group">
+                <label for="showLooseSel">LOOSE</label>
+                <select id="showLooseSel">
                   <option value="on" selected>Show</option>
                   <option value="off">Hide</option>
                 </select>
@@ -126,14 +132,12 @@
       </div>
     </header>
 
-    <main class="panel result-panel">
+    <main class="result-panel">
       <section class="held-panel">
-        <!-- <div class="section-title">HELD</div> -->
         <div id="heldNotes" class="held-notes"></div>
       </section>
 
       <section class="candidate-panel">
-        <!-- <div class="section-title">候補コード</div> -->
         <div id="candidateList" class="candidate-grid"></div>
       </section>
     </main>
